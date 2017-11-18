@@ -1,0 +1,6 @@
+fn_call_width = 80
+max_width = 80
+reorder_imports = true
+reorder_imported_names = true
+single_line_if_else_max_width = 80
+wrap_match_arms = false
