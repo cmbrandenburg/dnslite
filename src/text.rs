@@ -703,7 +703,6 @@ impl std::error::Error for TextDecodeError {
 }
 
 impl TextDecodeError {
-    #[doc(hidden)]
     pub fn new<E: Into<BoxedError>>(
         expectation: &'static str,
         position: TextPosition,
