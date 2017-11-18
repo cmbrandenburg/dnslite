@@ -7,6 +7,12 @@ description = "DNSlite is a Rust library for working with the DNS protocol."
 repository = "https://github.com/cmbrandenburg/dnslite"
 keywords = ["dns"]
 
+[dependencies]
+byteorder = "1.1"
+
+[dev-dependencies]
+assert_matches = "1.1"
+
 [lib]
 name = "dnslite"
 path = "src/lib.rs"
