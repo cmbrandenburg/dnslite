@@ -1,6 +1,7 @@
+use {BoxedError, std};
 use binary::prelude::*;
-use std;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use text::prelude::*;
 
 const MAX: u32 = 0x_8000_0000;
@@ -11,15 +12,15 @@ declare_static_error_type!(EOutOfRange, "Serial number is out of range");
 
 /// `Serial` is a zone serial number.
 ///
-/// A `Serial` instance wraps an unsigned 32-bit number that denotes a zone's
-/// configuration version.
+/// A **zone serial number** is an unsigned 32-bit integer denoting a zone's
+/// version. It's defined in [RFC 1035](https://tools.ietf.org/html/rfc1035).
 ///
 /// `Serial` implements **sequence space arithmetic**, defined in [RFC
 /// 1982][rfc_1982].
 ///
 /// * For addition,`Serial` safely wraps on overflow.
 /// * For comparison, `Serial` accounts for wrapping such that `s < s + n` for
-///   any value `s` where `n < 0x8000_0000`.
+///   any serial number `s` where `n < 0x8000_0000`.
 ///
 /// # Examples
 ///
@@ -63,6 +64,13 @@ impl Display for Serial {
 impl From<Serial> for u32 {
     fn from(x: Serial) -> Self {
         x.0
+    }
+}
+
+impl FromStr for Serial {
+    type Err = BoxedError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Serial::from_text_impl(s.as_bytes())
     }
 }
 
@@ -145,16 +153,8 @@ impl<'a, M: TextDecodeMode> DecodeText<'a, M> for Serial {
             e
         })?;
 
-        if token.iter().any(|&b| b < b'0' || b'9' < b) {
-            return Err(TextDecodeError::new(EXPECTATION, position, EBadSerial));
-        }
-
-        let utf8 = std::str::from_utf8(token).map_err(|_| {
-            TextDecodeError::new(EXPECTATION, position, EOutOfRange)
-        })?;
-
-        u32::from_str_radix(utf8, 10).map(|x| Serial(x)).map_err(|_| {
-            TextDecodeError::new(EXPECTATION, position, EOutOfRange)
+        Serial::from_text_impl(token).map_err(|e| {
+            TextDecodeError::new(EXPECTATION, position, e)
         })
     }
 }
@@ -169,24 +169,72 @@ impl EncodeText for Serial {
     }
 }
 
+impl Serial {
+    fn from_text_impl(text: &[u8]) -> Result<Self, BoxedError> {
+
+        if text.is_empty() || text.iter().any(|&b| b < b'0' || b'9' < b) {
+            return Err(EBadSerial)?;
+        }
+
+        let utf8 = unsafe { std::str::from_utf8_unchecked(text) };
+
+        Ok(u32::from_str_radix(utf8, 10).map(|x| Serial(x)).map_err(
+            |_| {
+                EOutOfRange
+            },
+        )?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // FIXME
     #[test]
-    fn serial_displays_as_decimal_number() {
-        let got = format!("{}", Serial(1234));
-        let expected = format!("{}", 1234);
-        assert_eq!(got, expected);
+    fn serial_displays_in_text_form() {
+        let text = format!("{}", Serial(1234));
+        let mut d = TextDecoder::new(text.as_bytes());
+        assert_matches!(
+            Serial::decode_text(&mut d),
+            Ok(x) if x == Serial(1234)
+        );
     }
 
     #[test]
-    fn u32_from_serial_is_inner_value() {
+    fn serial_converts_to_u32() {
         let x = Serial(1234);
         let got = u32::from(x);
         let expected = 1234;
         assert_eq!(got, expected);
+    }
+
+    #[test]
+    fn serial_converts_from_str() {
+
+        macro_rules! ok {
+            ($source:expr, $value:expr) => {
+                assert_matches!(
+                    Serial::from_str($source),
+                    Ok(x) if x == Serial($value)
+                );
+            };
+        }
+
+        macro_rules! nok {
+            ($source:expr, $cause_type:ty, $cause_value:expr) => {
+                assert_matches!(
+                    Serial::from_str($source),
+                    Err(ref e) if
+                        e.downcast_ref::<$cause_type>() == Some(&$cause_value)
+                );
+            };
+        }
+
+        ok!("0", 0);
+        ok!("4294967295", 4294967295);
+        nok!("", EBadSerial, EBadSerial);
+        nok!("invalid", EBadSerial, EBadSerial);
+        nok!("4294967296", EOutOfRange, EOutOfRange);
     }
 
     #[test]
@@ -236,57 +284,87 @@ mod tests {
     }
 
     #[test]
-    fn serial_implements_binary_encoding_and_decoding() {
-        let mut e = BinaryEncoder::new();
-        assert_matches!(Serial(0x12345678).encode_binary(&mut e), Ok(()));
-        let binary = e.into_buffer();
-        let mut d = BinaryDecoder::new(&binary);
-        assert_matches!(Serial::decode_binary(&mut d), Ok(Serial(0x12345678)));
-        assert_matches!(d.peek(), b"");
+    fn serial_encodes_to_and_decodes_from_binary() {
+
+        use error::EEndOfInput;
+
+        macro_rules! ok {
+            ($value:expr) => {
+                let mut e = BinaryEncoder::new();
+                assert_matches!(
+                    Serial($value).encode_binary(&mut e),
+                    Ok(())
+                );
+                let binary = e.into_buffer();
+                let mut d = BinaryDecoder::new(&binary);
+                assert_matches!(
+                    Serial::decode_binary(&mut d),
+                    Ok(Serial($value))
+                );
+                assert_matches!(d.peek(), b"");
+            };
+        }
+
+        macro_rules! nok {
+            ($binary:expr, $cause_type:ty, $cause_value:expr) => {
+                let mut d = BinaryDecoder::new($binary);
+                assert_matches!(
+                    Serial::decode_binary(&mut d),
+                    Err(ref e) if
+                        e.expectation() == EXPECTATION &&
+                        e.position() == 0 &&
+                        e.cause().downcast_ref::<$cause_type>() ==
+                            Some(&$cause_value)
+                );
+            };
+        }
+
+        ok!(0);
+        ok!(0x12345678);
+        ok!(0xffffffff);
+
+        nok!(b"", EEndOfInput, EEndOfInput);
+        nok!(b"\x12\x34\x56", EEndOfInput, EEndOfInput);
     }
 
     #[test]
-    fn serial_sets_expectation_when_binary_decoding_fails() {
-        let mut d = BinaryDecoder::new(b"\x12\x34\x56");
-        assert_matches!(
-            Serial::decode_binary(&mut d),
-            Err(ref e) if
-                e.expectation() == "serial number" &&
-                e.position() == 0
-        );
-    }
+    fn serial_encodes_to_and_decodes_from_text() {
 
-    #[test]
-    fn serial_implements_text_encoding_and_decoding() {
-        let mut e = TextEncoder::new(Vec::new());
-        assert_matches!(Serial(0x12345678).encode_text(&mut e), Ok(()));
-        let text = e.into_writer();
-        let mut d = TextDecoder::new(&text);
-        assert_matches!(Serial::decode_text(&mut d), Ok(Serial(0x12345678)));
-        assert_matches!(d.peek(), b"");
-    }
+        use error::EEndOfInput;
 
-    #[test]
-    fn serial_sets_expectation_when_text_decoding_fails() {
-        let mut d = TextDecoder::new(b"invalid");
-        assert_matches!(
-            Serial::decode_text(&mut d),
-            Err(ref e) if
-                e.expectation() == "serial number" &&
-                e.position() == TextPosition::zero() &&
-                e.cause().downcast_ref::<EBadSerial>() == Some(&EBadSerial)
-        );
-    }
+        macro_rules! ok {
+            ($value:expr) => {
+                let mut e = TextEncoder::new(Vec::new());
+                assert_matches!(Serial($value).encode_text(&mut e), Ok(()));
+                let text = e.into_writer();
+                let mut d = TextDecoder::new(&text);
+                assert_matches!(
+                    Serial::decode_text(&mut d),
+                    Ok(Serial($value))
+                );
+                assert_matches!(d.peek(), b"");
+            };
+        }
 
-    #[test]
-    fn serial_has_special_text_decoding_error_for_out_of_range() {
-        let mut d = TextDecoder::new(b"4294967296");
-        assert_matches!(
-            Serial::decode_text(&mut d),
-            Err(ref e) if
-                e.expectation() == "serial number" &&
-                e.position() == TextPosition::zero() &&
-                e.cause().downcast_ref::<EOutOfRange>() == Some(&EOutOfRange)
-        );
+        macro_rules! nok {
+            ($text:expr, $cause_type:ty, $cause_value:expr) => {
+                let mut d = TextDecoder::new($text);
+                assert_matches!(
+                    Serial::decode_text(&mut d),
+                    Err(ref e) if
+                        e.expectation() == EXPECTATION &&
+                        e.position() == TextPosition::zero() &&
+                        e.cause().downcast_ref::<$cause_type>() ==
+                            Some(&$cause_value)
+                );
+            };
+        }
+
+        ok!(0x12345678);
+        ok!(4294967295);
+
+        nok!(b"invalid", EBadSerial, EBadSerial);
+        nok!(b"", EEndOfInput, EEndOfInput);
+        nok!(b"4294967296", EOutOfRange, EOutOfRange);
     }
 }
