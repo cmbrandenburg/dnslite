@@ -1,7 +1,7 @@
 //! The `text` module provides functionality for encoding and decoding text
 //! data in zone-file format.
 
-use {BoxedError, Name, NameBuf, std};
+use {BoxedError, Name, NameBuf, ascii, std};
 use error::EEndOfInput;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
@@ -520,11 +520,12 @@ impl<'a, M: TextDecodeMode> TextDecoder<'a, M> {
                         EBadEscape,
                     ));
                 }
-                (_, Some(&b'\\')) if is_u8_digit(self.cursor[1]) => {
+                (_, Some(&b'\\'))
+                    if ascii::is_u8_ascii_digit(self.cursor[1]) => {
                     let n_digits = self.cursor[1..]
                         .iter()
                         .take(3)
-                        .filter(|&&b| is_u8_digit(b))
+                        .filter(|&&b| ascii::is_u8_ascii_digit(b))
                         .count();
                     if n_digits != 3 {
                         return Err(TextDecodeError::new(
@@ -1182,10 +1183,6 @@ pub fn format_string<W: std::fmt::Write>(
 
 fn is_u8_space(b: u8) -> bool {
     b == b' ' || b == b'\t'
-}
-
-fn is_u8_digit(b: u8) -> bool {
-    b'0' <= b && b <= b'9'
 }
 
 #[cfg(test)]

@@ -168,7 +168,6 @@ impl std::error::Error for BinaryDecodeError {
 }
 
 impl BinaryDecodeError {
-    #[doc(hidden)]
     pub fn new<E>(expectation: &'static str, position: usize, cause: E) -> Self
     where
         E: Into<BoxedError>,

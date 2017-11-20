@@ -1,4 +1,4 @@
-use {BoxedError, std};
+use {BoxedError, ascii, std};
 use binary::prelude::*;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -172,7 +172,9 @@ impl EncodeText for Serial {
 impl Serial {
     fn from_text_impl(text: &[u8]) -> Result<Self, BoxedError> {
 
-        if text.is_empty() || text.iter().any(|&b| b < b'0' || b'9' < b) {
+        if text.is_empty() ||
+            text.iter().any(|&b| !ascii::is_u8_ascii_digit(b))
+        {
             return Err(EBadSerial)?;
         }
 

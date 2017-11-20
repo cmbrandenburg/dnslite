@@ -12,6 +12,7 @@ mod ascii;
 mod name;
 mod serial;
 mod testing;
+mod ttl;
 
 pub mod binary;
 pub mod text;
@@ -19,3 +20,4 @@ pub mod text;
 pub use error::BoxedError;
 pub use name::{Label, Name, NameBuf, NameLabelIter};
 pub use serial::Serial;
+pub use ttl::Ttl;

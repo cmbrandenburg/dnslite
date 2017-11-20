@@ -79,6 +79,11 @@ impl AsciiCaseBytes {
     }
 }
 
+// This is a stand-in until AsciiExt::is_ascii_digit is stabilized.
+pub fn is_u8_ascii_digit(b: u8) -> bool {
+    b'0' <= b && b <= b'9'
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
