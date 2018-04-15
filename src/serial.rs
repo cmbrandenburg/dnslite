@@ -1,8 +1,8 @@
-use {BoxedError, ascii, std};
 use binary::prelude::*;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use text::prelude::*;
+use {ascii, std, BoxedError};
 
 const MAX: u32 = 0x_8000_0000;
 const EXPECTATION: &str = "serial number";
@@ -88,8 +88,8 @@ impl PartialOrd for Serial {
             Some(std::cmp::Ordering::Greater)
         } else {
             debug_assert!(
-                (i1 < i2 && i2 - i1 == 0x_8000_0000) ||
-                    (i1 > i2 && i1 - i2 == 0x_8000_0000)
+                (i1 < i2 && i2 - i1 == 0x_8000_0000)
+                    || (i1 > i2 && i1 - i2 == 0x_8000_0000)
             );
 
             // According to RFC 1982, section 3.2, implementations are free to
@@ -123,12 +123,12 @@ impl<'a> DecodeBinary<'a> for Serial {
     fn decode_binary(
         decoder: &mut BinaryDecoder<'a>,
     ) -> Result<Self, BinaryDecodeError> {
-        u32::decode_binary(decoder).map(|x| Serial(x)).map_err(
-            |mut e| {
+        u32::decode_binary(decoder)
+            .map(|x| Serial(x))
+            .map_err(|mut e| {
                 e.set_expectation(EXPECTATION);
                 e
-            },
-        )
+            })
     }
 }
 
@@ -153,9 +153,8 @@ impl<'a, M: TextDecodeMode> DecodeText<'a, M> for Serial {
             e
         })?;
 
-        Serial::from_text_impl(token).map_err(|e| {
-            TextDecodeError::new(EXPECTATION, position, e)
-        })
+        Serial::from_text_impl(token)
+            .map_err(|e| TextDecodeError::new(EXPECTATION, position, e))
     }
 }
 
@@ -172,19 +171,18 @@ impl EncodeText for Serial {
 impl Serial {
     fn from_text_impl(text: &[u8]) -> Result<Self, BoxedError> {
 
-        if text.is_empty() ||
-            text.iter().any(|&b| !ascii::is_u8_ascii_digit(b))
+        if text.is_empty()
+            || text.iter()
+                .any(|&b| !ascii::is_u8_ascii_digit(b))
         {
             return Err(EBadSerial)?;
         }
 
         let utf8 = unsafe { std::str::from_utf8_unchecked(text) };
 
-        Ok(u32::from_str_radix(utf8, 10).map(|x| Serial(x)).map_err(
-            |_| {
-                EOutOfRange
-            },
-        )?)
+        Ok(u32::from_str_radix(utf8, 10)
+            .map(|x| Serial(x))
+            .map_err(|_| EOutOfRange)?)
     }
 }
 
@@ -216,9 +214,9 @@ mod tests {
         macro_rules! ok {
             ($source:expr, $value:expr) => {
                 assert_matches!(
-                    Serial::from_str($source),
-                    Ok(x) if x == Serial($value)
-                );
+                                    Serial::from_str($source),
+                                    Ok(x) if x == Serial($value)
+                                );
             };
         }
 
@@ -249,9 +247,18 @@ mod tests {
         }
 
         assert_eq!(compare(0, 0), Some(Ordering::Equal));
-        assert_eq!(compare(0x7fff_ffff, 0x7fff_ffff), Some(Ordering::Equal));
-        assert_eq!(compare(0x8000_0000, 0x8000_0000), Some(Ordering::Equal));
-        assert_eq!(compare(0xffff_ffff, 0xffff_ffff), Some(Ordering::Equal));
+        assert_eq!(
+            compare(0x7fff_ffff, 0x7fff_ffff),
+            Some(Ordering::Equal)
+        );
+        assert_eq!(
+            compare(0x8000_0000, 0x8000_0000),
+            Some(Ordering::Equal)
+        );
+        assert_eq!(
+            compare(0xffff_ffff, 0xffff_ffff),
+            Some(Ordering::Equal)
+        );
 
         assert_eq!(compare(0, 1), Some(Ordering::Less));
         assert_eq!(compare(1, 0), Some(Ordering::Greater));
@@ -282,7 +289,10 @@ mod tests {
     fn serial_addition_wraps_on_overflow() {
         assert_eq!(Serial(17) + 42, Serial(59));
         assert_eq!(Serial(0xffff_ffff) + 1, Serial(0));
-        assert_eq!(Serial(0xffff_ffff) + 0x7fff_ffff, Serial(0x7fff_fffe));
+        assert_eq!(
+            Serial(0xffff_ffff) + 0x7fff_ffff,
+            Serial(0x7fff_fffe)
+        );
     }
 
     #[test]

@@ -1,10 +1,10 @@
 //! The `binary` module provides functionality for encoding and decoding binary
 //! DNS data.
 
-use {BoxedError, Name, std};
 use error::EEndOfInput;
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
+use {std, BoxedError, Name};
 
 /// The `prelude` module provides definitions for implementing binary-encoding
 /// and binary-decoding for a custom type.
@@ -37,7 +37,10 @@ pub struct BinaryDecoder<'a> {
 impl<'a> BinaryDecoder<'a> {
     /// Constructs a binary decoder that reads from a buffer.
     pub fn new(buffer: &'a [u8]) -> Self {
-        BinaryDecoder { buffer, cursor: 0 }
+        BinaryDecoder {
+            buffer,
+            cursor: 0,
+        }
     }
 
     /// Returns the source buffer.
@@ -119,10 +122,11 @@ impl<'a> BinaryDecoder<'a> {
     /// ```
     ///
     pub unsafe fn advance_cursor_unchecked(&mut self, len: usize) {
-        debug_assert!(self.cursor.checked_add(len).map_or(
-            false,
-            |x| x <= self.buffer.len(),
-        ));
+        debug_assert!(
+            self.cursor
+                .checked_add(len,)
+                .map_or(false, |x| x <= self.buffer.len(),)
+        );
         self.cursor += len;
     }
 }
@@ -376,9 +380,12 @@ impl<'a> TextEncoderCompressionGuard<'a> {
         if position < 0x4000 {
 
             // Duplicate entries are not allowed.
-            debug_assert!(self.encoder.compression_table.iter().all(
-                |&n| n != position,
-            ));
+            debug_assert!(
+                self.encoder
+                    .compression_table
+                    .iter()
+                    .all(|&n| n != position,)
+            );
 
             self.encoder.compression_table.push(position);
         }
@@ -397,14 +404,16 @@ impl<'a> TextEncoderCompressionGuard<'a> {
     /// 1035](https://tools.ietf.org/html/rfc1035).
     ///
     pub fn find_compression_entry(&self, key: &Name) -> Option<usize> {
-        self.encoder.compression_table.iter().cloned().find(
-            |&position| {
+        self.encoder
+            .compression_table
+            .iter()
+            .cloned()
+            .find(|&position| {
                 let name = unsafe {
                     Name::from_binary_unchecked(&self.encoder.buffer, position)
                 };
                 key.eq_case_sensitive(name)
-            },
-        )
+            })
     }
 }
 
@@ -445,7 +454,11 @@ impl<'a> DecodeBinary<'a> for u8 {
     ) -> Result<Self, BinaryDecodeError> {
         let buffer = d.peek();
         if buffer.len() < 1 {
-            return Err(BinaryDecodeError::new("u8", d.position(), EEndOfInput));
+            return Err(BinaryDecodeError::new(
+                "u8",
+                d.position(),
+                EEndOfInput,
+            ));
         }
         unsafe {
             d.advance_cursor_unchecked(1);
@@ -471,9 +484,11 @@ impl<'a> DecodeBinary<'a> for u16 {
         use byteorder::{BigEndian, ByteOrder};
         let buffer = d.peek();
         if buffer.len() < 2 {
-            return Err(
-                BinaryDecodeError::new("u16", d.position(), EEndOfInput),
-            );
+            return Err(BinaryDecodeError::new(
+                "u16",
+                d.position(),
+                EEndOfInput,
+            ));
         }
         let n = BigEndian::read_u16(&buffer[..2]);
         unsafe {
@@ -502,9 +517,11 @@ impl<'a> DecodeBinary<'a> for u32 {
         use byteorder::{BigEndian, ByteOrder};
         let buffer = d.peek();
         if buffer.len() < 4 {
-            return Err(
-                BinaryDecodeError::new("u32", d.position(), EEndOfInput),
-            );
+            return Err(BinaryDecodeError::new(
+                "u32",
+                d.position(),
+                EEndOfInput,
+            ));
         }
         let n = BigEndian::read_u32(&buffer[..4]);
         unsafe {
@@ -616,7 +633,8 @@ mod tests {
     }
 
     #[test]
-fn binary_encoder_matches_exact_name_when_searching_for_compression_entry(){
+    fn binary_encoder_matches_exact_name_when_searching_for_compression_entry()
+    {
 
         let source = b"\x05bravo\x00";
         let n1 = Name::from_binary(source, 0).unwrap();
@@ -735,6 +753,9 @@ fn binary_encoder_matches_exact_name_when_searching_for_compression_entry(){
             0x01020304u32.encode_binary(&mut e),
             Err(ref e) if *e == BinaryEncodeError::new()
         );
-        assert_eq!(e.into_buffer(), b"\x12\x34\x56\x78\x90\xab\xcd\xef");
+        assert_eq!(
+            e.into_buffer(),
+            b"\x12\x34\x56\x78\x90\xab\xcd\xef"
+        );
     }
 }

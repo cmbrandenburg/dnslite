@@ -1,4 +1,3 @@
-use {BoxedError, std, text};
 use ascii::AsciiCaseBytes;
 use binary::prelude::*;
 use std::borrow::{Borrow, Cow};
@@ -8,6 +7,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use text::prelude::*;
+use {std, text, BoxedError};
 
 // These limits are defined in RFC 1035.
 pub const MAX_LABEL_LENGTH: usize = 63;
@@ -43,7 +43,12 @@ struct EBadNameText(BoxedError);
 
 impl Display for EBadNameText {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
-        write!(f, "{}: {}", std::error::Error::description(self), self.0)
+        write!(
+            f,
+            "{}: {}",
+            std::error::Error::description(self),
+            self.0
+        )
     }
 }
 
@@ -418,7 +423,9 @@ impl Name {
             if prefix & 0b1100_0000 == 0b1100_0000 {
                 let hi = prefix ^ 0b1100_0000;
                 cur_offset += 1;
-                let lo = *buffer.get(cur_offset).ok_or_else(|| ENameOverrun)?;
+                let lo = *buffer
+                    .get(cur_offset)
+                    .ok_or_else(|| ENameOverrun)?;
                 let next_offset = ((hi as usize) << 8) + (lo as usize);
                 if min_offset <= next_offset {
                     return Err(EBadCompression)?;
@@ -491,10 +498,8 @@ impl Name {
     /// ```
     ///
     pub fn len(&self) -> usize {
-        self.labels().fold(
-            0,
-            |length, label| length + 1 + label.len(),
-        )
+        self.labels()
+            .fold(0, |length, label| length + 1 + label.len())
     }
 
     /// Returns true if and only if the domain name is the root domain
@@ -833,7 +838,9 @@ impl<'a, M: 'a + TextDecodeMode> DecodeText<'a, M> for NameBuf {
 impl NameBuf {
     /// Constructs the root domain name—i.e., `"."` in text form.
     pub fn root() -> Self {
-        NameBuf { buffer: vec![0] }
+        NameBuf {
+            buffer: vec![0],
+        }
     }
 
     /// Constructs a domain name by converting it from text form.
@@ -842,9 +849,8 @@ impl NameBuf {
     /// name is not fully qualified–i.e., ends with a `'.'`.
     ///
     pub fn from_text<B: AsRef<[u8]>>(text: B) -> Result<Self, BoxedError> {
-        Ok(Self::from_text_impl(text.as_ref(), None).map_err(
-            |e| EBadNameText(e),
-        )?)
+        Ok(Self::from_text_impl(text.as_ref(), None)
+            .map_err(|e| EBadNameText(e))?)
     }
 
     /// Constructs a domain name by converting it from text form.
@@ -856,9 +862,8 @@ impl NameBuf {
         text: B,
         origin: Option<&Name>,
     ) -> Result<Self, BoxedError> {
-        Ok(Self::from_text_impl(text.as_ref(), origin).map_err(|e| {
-            EBadNameText(e)
-        })?)
+        Ok(Self::from_text_impl(text.as_ref(), origin)
+            .map_err(|e| EBadNameText(e))?)
     }
 
     fn from_text_impl(
@@ -1060,7 +1065,9 @@ impl<'a> Iterator for NameLabelIter<'a> {
 impl<'a> NameLabelIter<'a> {
     fn new(name: &'a Name) -> Self {
         debug_assert!(name.is_normalized());
-        NameLabelIter { name: Some(name) }
+        NameLabelIter {
+            name: Some(name),
+        }
     }
 }
 
@@ -1098,7 +1105,7 @@ mod tests {
         }
 
         macro_rules! ok {
-            ($lhs:expr, eq, $rhs:expr) => {
+            ($lhs:expr,eq, $rhs:expr) => {
                 let (lhs, lhash) = make($lhs.as_ref());
                 let (rhs, rhash) = make($rhs.as_ref());
                 assert_eq!(lhs, rhs);
@@ -1107,7 +1114,7 @@ mod tests {
                 assert_eq!(rhs.cmp(&lhs), Ordering::Equal);
                 assert_eq!(lhash, rhash);
             };
-            ($lhs:expr, lt, $rhs:expr) => {
+            ($lhs:expr,lt, $rhs:expr) => {
                 let (lhs, lhash) = make($lhs.as_ref());
                 let (rhs, rhash) = make($rhs.as_ref());
                 assert_ne!(lhs, rhs);
@@ -1154,24 +1161,20 @@ mod tests {
     fn label_formats_to_string() {
 
         macro_rules! ok {
-            (debug, $source:expr) => {
-                {
-                    let label = Label::from_binary($source).unwrap();
-                    let result = format!("{:?}", label);
-                    let mut decoder = text::TextDecoder::new(result.as_bytes());
-                    let s = decoder.decode_string().unwrap();
-                    assert_eq!(s.as_ref(), $source);
-                }
-            };
-            (display, $source:expr) => {
-                {
-                    let label = Label::from_binary($source).unwrap();
-                    let result = format!("{}", label);
-                    let mut decoder = text::TextDecoder::new(result.as_bytes());
-                    let s = decoder.decode_string().unwrap();
-                    assert_eq!(s.as_ref(), $source);
-                }
-            };
+            (debug, $source:expr) => {{
+                let label = Label::from_binary($source).unwrap();
+                let result = format!("{:?}", label);
+                let mut decoder = text::TextDecoder::new(result.as_bytes());
+                let s = decoder.decode_string().unwrap();
+                assert_eq!(s.as_ref(), $source);
+            }};
+            (display, $source:expr) => {{
+                let label = Label::from_binary($source).unwrap();
+                let result = format!("{}", label);
+                let mut decoder = text::TextDecoder::new(result.as_bytes());
+                let s = decoder.decode_string().unwrap();
+                assert_eq!(s.as_ref(), $source);
+            }};
         }
 
         ok!(debug, b"alpha");
@@ -1226,9 +1229,21 @@ mod tests {
         ok!(b"\x00", 0, 1);
         ok!(b"\xff\x00", 1, 2);
         ok!(b"\xff\x05alpha\x05bravo\x07charlie\x00", 1, 22);
-        ok!(b"\x07charlie\x00\x05bravo\xc0\x00\x05alpha\xc0\x09", 0, 9);
-        ok!(b"\x07charlie\x00\x05bravo\xc0\x00\x05alpha\xc0\x09", 9, 17);
-        ok!(b"\x07charlie\x00\x05bravo\xc0\x00\x05alpha\xc0\x09", 17, 25);
+        ok!(
+            b"\x07charlie\x00\x05bravo\xc0\x00\x05alpha\xc0\x09",
+            0,
+            9
+        );
+        ok!(
+            b"\x07charlie\x00\x05bravo\xc0\x00\x05alpha\xc0\x09",
+            9,
+            17
+        );
+        ok!(
+            b"\x07charlie\x00\x05bravo\xc0\x00\x05alpha\xc0\x09",
+            17,
+            25
+        );
         ok!(b"\x05alpha\x00\xc0\x00\xc0\x07\xc0\x09", 11, 13);
 
         nok!(b"\x00", 1);
@@ -1248,8 +1263,8 @@ mod tests {
         {
             let mut buffer = vec![0xff; 258];
             buffer.extend_from_slice(b"\x05alpha\x00\xc1\x02");
-            ok!(&buffer, 258+0, 258+7);
-            ok!(&buffer, 258+7, 258+9);
+            ok!(&buffer, 258 + 0, 258 + 7);
+            ok!(&buffer, 258 + 7, 258 + 9);
         }
 
         // Domain name too long:
@@ -1300,22 +1315,22 @@ mod tests {
     #[test]
     fn name_provides_case_sensitive_comparison() {
 
-        let n1 = Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0)
-            .unwrap();
-        let n2 = Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0)
-            .unwrap();
+        let n1 =
+            Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0).unwrap();
+        let n2 =
+            Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0).unwrap();
         assert!(n1.eq_case_sensitive(&n2));
 
-        let n1 = Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0)
-            .unwrap();
-        let n2 = Name::from_binary(b"\x05AlPhA\x05bRaVo\x07ChArLiE\x00", 0)
-            .unwrap();
+        let n1 =
+            Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0).unwrap();
+        let n2 =
+            Name::from_binary(b"\x05AlPhA\x05bRaVo\x07ChArLiE\x00", 0).unwrap();
         assert!(!n1.eq_case_sensitive(&n2));
 
-        let n1 = Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0)
-            .unwrap();
-        let n2 = Name::from_binary(b"\x05alpha\x05bravo\x05delta\x00", 0)
-            .unwrap();
+        let n1 =
+            Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0).unwrap();
+        let n2 =
+            Name::from_binary(b"\x05alpha\x05bravo\x05delta\x00", 0).unwrap();
         assert!(!n1.eq_case_sensitive(&n2))
     }
 
@@ -1339,12 +1354,12 @@ mod tests {
         );
         assert_eq!(
             n3.split_first(),
-            (Label::from_binary(b"charlie").unwrap(), Some(n4))
+            (
+                Label::from_binary(b"charlie").unwrap(),
+                Some(n4)
+            )
         );
-        assert_eq!(
-            n4.split_first(),
-            (Label::root(), None)
-        );
+        assert_eq!(n4.split_first(), (Label::root(), None));
     }
 
     #[test]
@@ -1361,22 +1376,36 @@ mod tests {
         ok!(b"\x00", 0, 1);
         ok!(b"\x05alpha\x00", 0, 7);
         ok!(b"\x05alpha\x05bravo\x07charlie\x00", 0, 21);
-        ok!(b"\x07charlie\x00\x05bravo\xc0\x00\x05alpha\xc0\x09", 17, 21);
+        ok!(
+            b"\x07charlie\x00\x05bravo\xc0\x00\x05alpha\xc0\x09",
+            17,
+            21
+        );
         ok!(b"\x05alpha\x00\xc0\x00\xc0\x07\xc0\x09", 11, 7);
     }
 
     #[test]
     fn name_is_empty() {
-        assert!(Name::from_binary(b"\x00", 0).unwrap().is_empty());
-        assert!(Name::from_binary(b"alpha\x00", 5).unwrap().is_empty());
-        assert!(!Name::from_binary(b"\x05alpha\x00", 0).unwrap().is_empty());
+        assert!(
+            Name::from_binary(b"\x00", 0)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            Name::from_binary(b"alpha\x00", 5)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(!Name::from_binary(b"\x05alpha\x00", 0)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
     fn name_pops_front_label() {
 
-        let n = Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0)
-            .unwrap();
+        let n =
+            Name::from_binary(b"\x05alpha\x05bravo\x07charlie\x00", 0).unwrap();
 
         let mut popped = n;
         assert_eq!(
@@ -1391,7 +1420,10 @@ mod tests {
         );
 
         popped = popped.pop_front().unwrap();
-        assert_eq!(popped, Name::from_binary(b"\x07charlie\x00", 0).unwrap());
+        assert_eq!(
+            popped,
+            Name::from_binary(b"\x07charlie\x00", 0).unwrap()
+        );
 
         popped = popped.pop_front().unwrap();
         assert_eq!(popped, Name::from_binary(b"\x00", 0).unwrap());
@@ -1418,42 +1450,65 @@ mod tests {
         }
 
         macro_rules! nok {
-            ($text:expr, $origin:expr) => {
-                {
-                    let mut d = TextDecoder::new($text);
-                    d.set_origin($origin.map(|x| {
-                        Name::from_binary(x, 0).unwrap().to_owned()}
-                    ));
-                    assert_matches!(
-                        NameBuf::decode_text(&mut d),
-                        Err(ref e) if
-                            e.expectation() == EXPECTATION_NAME &&
-                            e.position() == TextPosition::zero()
-                    );
-                }
-            };
+            ($text:expr, $origin:expr) => {{
+                let mut d = TextDecoder::new($text);
+                d.set_origin(
+                    $origin.map(|x| Name::from_binary(x, 0).unwrap().to_owned()),
+                );
+                assert_matches!(
+                                    NameBuf::decode_text(&mut d),
+                                    Err(ref e) if
+                                        e.expectation() == EXPECTATION_NAME &&
+                                        e.position() == TextPosition::zero()
+                                );
+            }};
         }
 
         // Verify: The text input may contain a fully qualified domain name.
 
         ok!(b".", None, b"\x00", b"");
         ok!(b"alpha.", None, b"\x05alpha\x00", b"");
-        ok!(b"alpha.bravo.", None, b"\x05alpha\x05bravo\x00", b"");
+        ok!(
+            b"alpha.bravo.",
+            None,
+            b"\x05alpha\x05bravo\x00",
+            b""
+        );
 
         // Verify: The text input may contain a partially qualified domain name
         // if the origin is set.
 
         ok!(b"alpha", Some(b"\x00"), b"\x05alpha\x00", b"");
-        ok!(b"alpha", Some(b"\x05bravo\x00"), b"\x05alpha\x05bravo\x00", b"");
+        ok!(
+            b"alpha",
+            Some(b"\x05bravo\x00"),
+            b"\x05alpha\x05bravo\x00",
+            b""
+        );
 
         // Verify: The text input may be quoted.
 
-        ok!(b"\"alpha bravo.\"", None, b"\x0balpha bravo\x00", b"");
+        ok!(
+            b"\"alpha bravo.\"",
+            None,
+            b"\x0balpha bravo\x00",
+            b""
+        );
 
         // Verify: The text input may be escaped.
 
-        ok!(b"alpha\\ bravo.", None, b"\x0balpha bravo\x00", b"");
-        ok!(b"alpha\\.bravo.", None, b"\x0balpha.bravo\x00", b"");
+        ok!(
+            b"alpha\\ bravo.",
+            None,
+            b"\x0balpha bravo\x00",
+            b""
+        );
+        ok!(
+            b"alpha\\.bravo.",
+            None,
+            b"\x0balpha.bravo\x00",
+            b""
+        );
 
         // Verify: The text input must not be empty, regardless whether the
         // origin is set.
@@ -1470,7 +1525,12 @@ mod tests {
         // ignored.
 
         ok!(b".", Some(b"\x05bravo\x00"), b"\x00", b"");
-        ok!(b"alpha.", Some(b"\x05bravo\x00"), b"\x05alpha\x00", b"");
+        ok!(
+            b"alpha.",
+            Some(b"\x05bravo\x00"),
+            b"\x05alpha\x00",
+            b""
+        );
 
         // Verify: Any empty label must be last.
 
@@ -1661,22 +1721,20 @@ mod tests {
     fn name_formats_to_string() {
 
         macro_rules! ok {
-            ($source:expr) => {
-                {
-                    let source = Name::from_binary($source, 0).unwrap();
-                    let text = format!("{}", source);
-                    match NameBuf::from_text(text.as_bytes()) {
-                        Ok(ref x) if *x == source => {}
-                        x => panic!("Got unexpected display result {:?}", x),
-                    }
-
-                    let text = format!("{:?}", source);
-                    match NameBuf::from_text(text.as_bytes()) {
-                        Ok(ref x) if *x == source => {}
-                        x => panic!("Got unexpected debug result {:?}", x),
-                    }
+            ($source:expr) => {{
+                let source = Name::from_binary($source, 0).unwrap();
+                let text = format!("{}", source);
+                match NameBuf::from_text(text.as_bytes()) {
+                    Ok(ref x) if *x == source => {}
+                    x => panic!("Got unexpected display result {:?}", x),
                 }
-            };
+
+                let text = format!("{:?}", source);
+                match NameBuf::from_text(text.as_bytes()) {
+                    Ok(ref x) if *x == source => {}
+                    x => panic!("Got unexpected debug result {:?}", x),
+                }
+            }};
         }
 
         ok!(b"\x00");
@@ -1700,8 +1758,8 @@ mod tests {
     #[test]
     fn name_encodes_and_name_buf_decodes_as_text() {
 
-        let source = Name::from_binary(b"\x0balpha bravo\x07charlie\x00", 0)
-            .unwrap();
+        let source =
+            Name::from_binary(b"\x0balpha bravo\x07charlie\x00", 0).unwrap();
 
         let mut encoder = TextEncoder::new(Vec::new());
         source.encode_text(&mut encoder).unwrap();
@@ -1717,8 +1775,8 @@ mod tests {
     #[test]
     fn name_encodes_and_decodes_as_binary() {
 
-        let source = Name::from_binary(b"\x0balpha bravo\x07charlie\x00", 0)
-            .unwrap();
+        let source =
+            Name::from_binary(b"\x0balpha bravo\x07charlie\x00", 0).unwrap();
 
         let mut encoder = BinaryEncoder::new();
         source.encode_binary(&mut encoder).unwrap();
@@ -1756,14 +1814,14 @@ mod tests {
                 let source = Name::from_binary($source, 0).unwrap();
                 let text = format!("{:?}", source);
                 assert_matches!(
-                    NameBuf::from_text(text.as_bytes()),
-                    Ok(ref n) if n == source
-                );
+                                    NameBuf::from_text(text.as_bytes()),
+                                    Ok(ref n) if n == source
+                                );
                 let text = format!("{}", source);
                 assert_matches!(
-                    NameBuf::from_text(text.as_bytes()),
-                    Ok(ref n) if n == source
-                );
+                                    NameBuf::from_text(text.as_bytes()),
+                                    Ok(ref n) if n == source
+                                );
             };
         }
 

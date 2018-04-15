@@ -1,4 +1,4 @@
-#[allow(unused)] // otherwise warns on nightly, as of 2017-11-18
+#[allow(unused)]
 use std::ascii::AsciiExt;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -57,12 +57,12 @@ impl Ord for AsciiCaseBytes {
 
         loop {
             match (a.next(), b.next()) {
-                (Some(a), Some(b)) => {
-                    match a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()) {
-                        Ordering::Equal => continue,
-                        x => return x,
-                    }
-                }
+                (Some(a), Some(b)) => match a.to_ascii_lowercase()
+                    .cmp(&b.to_ascii_lowercase())
+                {
+                    Ordering::Equal => continue,
+                    x => return x,
+                },
                 (Some(_), None) => return Ordering::Greater,
                 (None, Some(_)) => return Ordering::Less,
                 (None, None) => return Ordering::Equal,
@@ -101,7 +101,7 @@ mod tests {
         }
 
         macro_rules! tc {
-            ($lhs:expr, eq, $rhs:expr) => {
+            ($lhs:expr,eq, $rhs:expr) => {
                 let (lhs, lhash) = make($lhs.as_ref());
                 let (rhs, rhash) = make($rhs.as_ref());
                 assert_eq!(lhs, rhs);
@@ -110,7 +110,7 @@ mod tests {
                 assert_eq!(rhs.cmp(&lhs), Ordering::Equal);
                 assert_eq!(lhash, rhash);
             };
-            ($lhs:expr, lt, $rhs:expr) => {
+            ($lhs:expr,lt, $rhs:expr) => {
                 let (lhs, lhash) = make($lhs.as_ref());
                 let (rhs, rhash) = make($rhs.as_ref());
                 assert_ne!(lhs, rhs);

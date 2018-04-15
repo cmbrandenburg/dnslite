@@ -1,11 +1,11 @@
 //! The `text` module provides functionality for encoding and decoding text
 //! data in zone-file format.
 
-use {BoxedError, Name, NameBuf, ascii, std};
 use error::EEndOfInput;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
+use {ascii, std, BoxedError, Name, NameBuf};
 
 /// The `prelude` module provides definitions for implementing text-encoding and
 /// text-decoding for a custom type.
@@ -17,8 +17,14 @@ pub mod prelude {
 
 declare_static_error_type!(EBadEscape, "Escape sequence is ill-formed");
 declare_static_error_type!(EParenNotClosed, "Parenthesis '(' is not closed");
-declare_static_error_type!(EParenNotMatched, "Parenthesis ')' is not matched");
-declare_static_error_type!(EParensTooDeep, "Parentheses are nested too deeply");
+declare_static_error_type!(
+    EParenNotMatched,
+    "Parenthesis ')' is not matched"
+);
+declare_static_error_type!(
+    EParensTooDeep,
+    "Parentheses are nested too deeply"
+);
 declare_static_error_type!(EQuoteNotClosed, "Quote is not closed");
 
 #[doc(hidden)]
@@ -30,8 +36,7 @@ impl Display for EBadChar {
         write!(
             f,
             "Got unexpected character {:?} (0x{:x})",
-            self.0 as char,
-            self.0
+            self.0 as char, self.0
         )
     }
 }
@@ -154,15 +159,15 @@ impl TextDecodeMode for RDataMode {
                 continue;
             }
 
-            if 1 <= decoder.rdata_paren_depth &&
-                decoder.cursor.starts_with(b"\r\n")
+            if 1 <= decoder.rdata_paren_depth
+                && decoder.cursor.starts_with(b"\r\n")
             {
                 decoder.advance_cursor(2, true);
                 continue;
             }
 
-            if 1 <= decoder.rdata_paren_depth &&
-                decoder.cursor.starts_with(b"\n")
+            if 1 <= decoder.rdata_paren_depth
+                && decoder.cursor.starts_with(b"\n")
             {
                 decoder.advance_cursor(1, true);
                 continue;
@@ -369,8 +374,8 @@ impl<'a, M: TextDecodeMode> TextDecoder<'a, M> {
 
             self.advance_cursor(n, false);
 
-            if self.cursor.starts_with(b"\r") &&
-                !self.cursor.starts_with(b"\r\n")
+            if self.cursor.starts_with(b"\r")
+                && !self.cursor.starts_with(b"\r\n")
             {
                 self.advance_cursor(1, false);
                 continue;
@@ -465,27 +470,27 @@ impl<'a, M: TextDecodeMode> TextDecoder<'a, M> {
         let quoted = match self.string_continuation {
             StringContinuation::Quoted => true,
             StringContinuation::Unquoted => false,
-            StringContinuation::None => {
-                match self.cursor.first().cloned() {
-                    None => return Err(TextDecodeError::new(
+            StringContinuation::None => match self.cursor.first().cloned() {
+                None => {
+                    return Err(TextDecodeError::new(
                         EXPECTATION,
                         self.position,
                         EEndOfInput,
-                    )),
-                    Some(b'"') => {
-                        self.advance_cursor(1, false);
-                        true
-                    }
-                    Some(b) if is_u8_unquoted_delim(b) => {
-                        return Err(TextDecodeError::new(
-                            EXPECTATION,
-                            self.position,
-                            EBadChar(b),
-                        ));
-                    }
-                    _ => false,
+                    ))
                 }
-            }
+                Some(b'"') => {
+                    self.advance_cursor(1, false);
+                    true
+                }
+                Some(b) if is_u8_unquoted_delim(b) => {
+                    return Err(TextDecodeError::new(
+                        EXPECTATION,
+                        self.position,
+                        EBadChar(b),
+                    ));
+                }
+                _ => false,
+            },
         };
 
         self.string_continuation = StringContinuation::None;
@@ -521,7 +526,8 @@ impl<'a, M: TextDecodeMode> TextDecoder<'a, M> {
                     ));
                 }
                 (_, Some(&b'\\'))
-                    if ascii::is_u8_ascii_digit(self.cursor[1]) => {
+                    if ascii::is_u8_ascii_digit(self.cursor[1]) =>
+                {
                     let n_digits = self.cursor[1..]
                         .iter()
                         .take(3)
@@ -534,9 +540,9 @@ impl<'a, M: TextDecodeMode> TextDecoder<'a, M> {
                             EBadEscape,
                         ));
                     }
-                    let m = 100 * u16::from(self.cursor[1] - b'0') +
-                        10 * u16::from(self.cursor[2] - b'0') +
-                        u16::from(self.cursor[3] - b'0');
+                    let m = 100 * u16::from(self.cursor[1] - b'0')
+                        + 10 * u16::from(self.cursor[2] - b'0')
+                        + u16::from(self.cursor[3] - b'0');
                     if 256 <= m {
                         return Err(TextDecodeError::new(
                             EXPECTATION,
@@ -549,7 +555,8 @@ impl<'a, M: TextDecodeMode> TextDecoder<'a, M> {
                     self.advance_cursor(4, false);
                 }
                 (_, Some(&b'\\'))
-                    if self.cursor[1] == b'\n' || self.cursor[1] == b'\r' => {
+                    if self.cursor[1] == b'\n' || self.cursor[1] == b'\r' =>
+                {
                     return Err(TextDecodeError::new(
                         EXPECTATION,
                         self.position,
@@ -569,9 +576,7 @@ impl<'a, M: TextDecodeMode> TextDecoder<'a, M> {
                 (false, Some(&b)) if is_u8_unquoted_delim(b) => {
                     return Ok((capture.into_cow(), false));
                 }
-                (true, None) |
-                (true, Some(&b'\r')) |
-                (true, Some(&b'\n')) => {
+                (true, None) | (true, Some(&b'\r')) | (true, Some(&b'\n')) => {
                     return Err(TextDecodeError::new(
                         EXPECTATION,
                         self.position,
@@ -644,7 +649,8 @@ pub struct TextDecoderMultiStringIter<'a: 'b, 'b, M: 'a + TextDecodeMode> {
 }
 
 impl<'a, 'b, M: TextDecodeMode> Iterator
-    for TextDecoderMultiStringIter<'a, 'b, M> {
+    for TextDecoderMultiStringIter<'a, 'b, M>
+{
     type Item = Result<Cow<'a, [u8]>, TextDecodeError>;
     fn next(&mut self) -> Option<Self::Item> {
 
@@ -652,7 +658,9 @@ impl<'a, 'b, M: TextDecodeMode> Iterator
             return None;
         }
 
-        match self.decoder.decode_string_impl(Some(self.separator)) {
+        match self.decoder
+            .decode_string_impl(Some(self.separator))
+        {
             Err(e) => Some(Err(e)),
             Ok((part, more)) => {
                 debug_assert!(!self.done);
@@ -775,7 +783,11 @@ impl TextPosition {
     }
 
     pub fn new(line: u64, column: u64, byte: u64) -> Self {
-        TextPosition { line, column, byte }
+        TextPosition {
+            line,
+            column,
+            byte,
+        }
     }
 
     pub fn line(&self) -> u64 {
@@ -1025,7 +1037,12 @@ pub struct TextEncodeError {
 
 impl Display for TextEncodeError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
-        write!(f, "{}: {}", std::error::Error::description(self), self.cause)
+        write!(
+            f,
+            "{}: {}",
+            std::error::Error::description(self),
+            self.cause
+        )
     }
 }
 
@@ -1050,7 +1067,9 @@ impl From<std::io::Error> for TextEncodeError {
 impl TextEncodeError {
     #[doc(hidden)]
     pub fn new<E: Into<BoxedError>>(cause: E) -> Self {
-        TextEncodeError { cause: cause.into() }
+        TextEncodeError {
+            cause: cause.into(),
+        }
     }
 }
 
@@ -1064,14 +1083,21 @@ impl TextEncodeError {
 //
 #[derive(Debug)]
 enum Capture<'a> {
-    Borrowed { buffer: &'a [u8], length: usize },
-    Owned { buffer: Vec<u8> },
+    Borrowed {
+        buffer: &'a [u8],
+        length: usize,
+    },
+    Owned {
+        buffer: Vec<u8>,
+    },
 }
 
 impl<'a> Capture<'a> {
     fn extend(&mut self, bytes: &'a [u8]) {
         match *self {
-            Capture::Borrowed { ref mut length, .. } => {
+            Capture::Borrowed {
+                ref mut length, ..
+            } => {
                 *length += bytes.len();
             }
             Capture::Owned { ref mut buffer } => {
@@ -1082,7 +1108,9 @@ impl<'a> Capture<'a> {
 
     fn push(&mut self, b: u8) {
         match *self {
-            Capture::Borrowed { ref mut length, .. } => {
+            Capture::Borrowed {
+                ref mut length, ..
+            } => {
                 *length += 1;
             }
             Capture::Owned { ref mut buffer } => {
@@ -1096,14 +1124,16 @@ impl<'a> Capture<'a> {
             Capture::Borrowed { buffer, length } => (buffer, length),
             _ => return,
         };
-        *self = Capture::Owned { buffer: Vec::from(&buffer[..length]) };
+        *self = Capture::Owned {
+            buffer: Vec::from(&buffer[..length]),
+        };
     }
 
     fn into_cow(self) -> Cow<'a, [u8]> {
         match self {
-            Capture::Borrowed { buffer, length } => Cow::Borrowed(
-                &buffer[..length],
-            ),
+            Capture::Borrowed { buffer, length } => {
+                Cow::Borrowed(&buffer[..length])
+            }
             Capture::Owned { buffer } => Cow::Owned(buffer),
         }
     }
@@ -1134,8 +1164,8 @@ pub fn format_string<W: std::fmt::Write>(
     }
 
     fn is_u8_unquoted_special(b: u8) -> bool {
-        b <= 32 || 128 <= b || b == b'"' || b == b'(' || b == b')' ||
-            b == b'\\' || b == b';'
+        b <= 32 || 128 <= b || b == b'"' || b == b'(' || b == b')' || b == b'\\'
+            || b == b';'
     }
 
     let mut cursor = text;
@@ -1224,10 +1254,25 @@ mod tests {
 
         nok!(b"\r\n", (0, 0, 0), EBadChar, EBadChar(b'\r'));
         nok!(b"\n", (0, 0, 0), EBadChar, EBadChar(b'\n'));
-        nok!(b" \t \t \t\r\n", (0, 6, 6), EBadChar, EBadChar(b'\r'));
-        nok!(b" \t \t \t\n", (0, 6, 6), EBadChar, EBadChar(b'\n'));
+        nok!(
+            b" \t \t \t\r\n",
+            (0, 6, 6),
+            EBadChar,
+            EBadChar(b'\r')
+        );
+        nok!(
+            b" \t \t \t\n",
+            (0, 6, 6),
+            EBadChar,
+            EBadChar(b'\n')
+        );
         nok!(b"alpha", (0, 0, 0), EBadChar, EBadChar(b'a'));
-        nok!(b" \t \t \talpha", (0, 6, 6), EBadChar, EBadChar(b'a'));
+        nok!(
+            b" \t \t \talpha",
+            (0, 6, 6),
+            EBadChar,
+            EBadChar(b'a')
+        );
     }
 
     #[test]
@@ -1314,17 +1359,52 @@ mod tests {
         ok!(b" ; alpha\n", b"");
         ok!(b"( ; alpha\r\n  ; bravo\r\n)", b"");
 
-        nok!(b"(", (0, 1, 1), EParenNotClosed, EParenNotClosed);
-        nok!(b"((())", (0, 5, 5), EParenNotClosed, EParenNotClosed);
-        nok!(b"(\r\n", (1, 0, 3), EParenNotClosed, EParenNotClosed);
+        nok!(
+            b"(",
+            (0, 1, 1),
+            EParenNotClosed,
+            EParenNotClosed
+        );
+        nok!(
+            b"((())",
+            (0, 5, 5),
+            EParenNotClosed,
+            EParenNotClosed
+        );
+        nok!(
+            b"(\r\n",
+            (1, 0, 3),
+            EParenNotClosed,
+            EParenNotClosed
+        );
 
-        nok!(b")", (0, 0, 0), EParenNotMatched, EParenNotMatched);
-        nok!(b"((())))", (0, 6, 6), EParenNotMatched, EParenNotMatched);
-        nok!(b"(\r\n))", (1, 1, 4), EParenNotMatched, EParenNotMatched);
+        nok!(
+            b")",
+            (0, 0, 0),
+            EParenNotMatched,
+            EParenNotMatched
+        );
+        nok!(
+            b"((())))",
+            (0, 6, 6),
+            EParenNotMatched,
+            EParenNotMatched
+        );
+        nok!(
+            b"(\r\n))",
+            (1, 1, 4),
+            EParenNotMatched,
+            EParenNotMatched
+        );
 
         nok!(b"alpha", (0, 0, 0), EBadChar, EBadChar(b'a'));
         nok!(b"\r", (0, 0, 0), EBadChar, EBadChar(b'\r'));
-        nok!(b"(; comment\r\n)alpha", (1, 1, 13), EBadChar, EBadChar(b'a'));
+        nok!(
+            b"(; comment\r\n)alpha",
+            (1, 1, 13),
+            EBadChar,
+            EBadChar(b'a')
+        );
     }
 
     #[test]
@@ -1424,7 +1504,12 @@ mod tests {
         nok!(b"\t", (0, 1, 1), EEndOfInput, EEndOfInput);
         nok!(b"\r\n", (0, 0, 0), EBadChar, EBadChar(b'\r'));
         nok!(b"\n", (0, 0, 0), EBadChar, EBadChar(b'\n'));
-        nok!(b")", (0, 0, 0), EParenNotMatched, EParenNotMatched);
+        nok!(
+            b")",
+            (0, 0, 0),
+            EParenNotMatched,
+            EParenNotMatched
+        );
         nok!(b";", (0, 1, 1), EEndOfInput, EEndOfInput);
     }
 
@@ -1435,9 +1520,9 @@ mod tests {
             ($source:expr, $string:expr, $remainder:expr) => {
                 let mut d = TextDecoder::new($source);
                 assert_matches!(
-                    d.decode_string(),
-                    Ok(ref x) if x.as_ref() == $string
-                );
+                                    d.decode_string(),
+                                    Ok(ref x) if x.as_ref() == $string
+                                );
                 assert_eq!(d.peek(), $remainder);
             };
         }
@@ -1506,7 +1591,12 @@ mod tests {
         nok!(b")alpha", (0, 0, 0), EBadChar, EBadChar(b')'));
         nok!(b";alpha", (0, 0, 0), EBadChar, EBadChar(b';'));
 
-        nok!(b"\"alpha", (0, 6, 6), EQuoteNotClosed, EQuoteNotClosed);
+        nok!(
+            b"\"alpha",
+            (0, 6, 6),
+            EQuoteNotClosed,
+            EQuoteNotClosed
+        );
         nok!(
             b"\"alpha\r\nbravo\"",
             (0, 6, 6),
@@ -1514,12 +1604,32 @@ mod tests {
             EQuoteNotClosed
         );
 
-        nok!(b"alpha\\256bravo", (0, 5, 5), EBadEscape, EBadEscape);
-        nok!(b"alpha\\25bravo", (0, 5, 5), EBadEscape, EBadEscape);
+        nok!(
+            b"alpha\\256bravo",
+            (0, 5, 5),
+            EBadEscape,
+            EBadEscape
+        );
+        nok!(
+            b"alpha\\25bravo",
+            (0, 5, 5),
+            EBadEscape,
+            EBadEscape
+        );
         nok!(b"alpha\\25", (0, 5, 5), EBadEscape, EBadEscape);
-        nok!(b"alpha\\2bravo", (0, 5, 5), EBadEscape, EBadEscape);
+        nok!(
+            b"alpha\\2bravo",
+            (0, 5, 5),
+            EBadEscape,
+            EBadEscape
+        );
         nok!(b"alpha\\2", (0, 5, 5), EBadEscape, EBadEscape);
-        nok!(b"alpha\\\nbravo", (0, 5, 5), EBadEscape, EBadEscape);
+        nok!(
+            b"alpha\\\nbravo",
+            (0, 5, 5),
+            EBadEscape,
+            EBadEscape
+        );
     }
 
     #[test]
@@ -1529,9 +1639,9 @@ mod tests {
             ($source:expr, $string:expr, $remainder:expr) => {
                 let mut d = TextDecoder::new($source).begin_rdata();
                 assert_matches!(
-                    d.decode_string(),
-                    Ok(ref x) if x.as_ref() == $string
-                );
+                                    d.decode_string(),
+                                    Ok(ref x) if x.as_ref() == $string
+                                );
                 assert_eq!(d.peek(), $remainder);
             };
         }
@@ -1602,10 +1712,20 @@ mod tests {
         nok!(b"\t", (0, 1, 1), EEndOfInput, EEndOfInput);
         nok!(b"\r\n", (0, 0, 0), EBadChar, EBadChar(b'\r'));
         nok!(b"\n", (0, 0, 0), EBadChar, EBadChar(b'\n'));
-        nok!(b")", (0, 0, 0), EParenNotMatched, EParenNotMatched);
+        nok!(
+            b")",
+            (0, 0, 0),
+            EParenNotMatched,
+            EParenNotMatched
+        );
         nok!(b";", (0, 1, 1), EEndOfInput, EEndOfInput);
 
-        nok!(b"\"alpha", (0, 6, 6), EQuoteNotClosed, EQuoteNotClosed);
+        nok!(
+            b"\"alpha",
+            (0, 6, 6),
+            EQuoteNotClosed,
+            EQuoteNotClosed
+        );
         nok!(
             b"\"alpha\r\nbravo\"",
             (0, 6, 6),
@@ -1613,12 +1733,32 @@ mod tests {
             EQuoteNotClosed
         );
 
-        nok!(b"alpha\\256bravo", (0, 5, 5), EBadEscape, EBadEscape);
-        nok!(b"alpha\\25bravo", (0, 5, 5), EBadEscape, EBadEscape);
+        nok!(
+            b"alpha\\256bravo",
+            (0, 5, 5),
+            EBadEscape,
+            EBadEscape
+        );
+        nok!(
+            b"alpha\\25bravo",
+            (0, 5, 5),
+            EBadEscape,
+            EBadEscape
+        );
         nok!(b"alpha\\25", (0, 5, 5), EBadEscape, EBadEscape);
-        nok!(b"alpha\\2bravo", (0, 5, 5), EBadEscape, EBadEscape);
+        nok!(
+            b"alpha\\2bravo",
+            (0, 5, 5),
+            EBadEscape,
+            EBadEscape
+        );
         nok!(b"alpha\\2", (0, 5, 5), EBadEscape, EBadEscape);
-        nok!(b"alpha\\\nbravo", (0, 5, 5), EBadEscape, EBadEscape);
+        nok!(
+            b"alpha\\\nbravo",
+            (0, 5, 5),
+            EBadEscape,
+            EBadEscape
+        );
     }
 
     #[test]
@@ -1657,7 +1797,12 @@ mod tests {
         ok!(b'.', b".", &[&b""[..], &b""[..]], b"");
         ok!(b'.', b"alpha", &[&b"alpha"[..]], b"");
         ok!(b'.', b"alpha.", &[&b"alpha"[..], &b""[..]], b"");
-        ok!(b'.', b"alpha.bravo", &[&b"alpha"[..], &b"bravo"[..]], b"");
+        ok!(
+            b'.',
+            b"alpha.bravo",
+            &[&b"alpha"[..], &b"bravo"[..]],
+            b""
+        );
         ok!(
             b'.',
             b"alpha.bravo.",
@@ -1674,8 +1819,18 @@ mod tests {
         ok!(b'.', b"\"\"", &[&b""[..]], b"");
         ok!(b'.', b"\".\"", &[&b""[..], &b""[..]], b"");
         ok!(b'.', b"\"alpha\"", &[&b"alpha"[..]], b"");
-        ok!(b'.', b"\"alpha.\"", &[&b"alpha"[..], &b""[..]], b"");
-        ok!(b'.', b"\"alpha.bravo\"", &[&b"alpha"[..], &b"bravo"[..]], b"");
+        ok!(
+            b'.',
+            b"\"alpha.\"",
+            &[&b"alpha"[..], &b""[..]],
+            b""
+        );
+        ok!(
+            b'.',
+            b"\"alpha.bravo\"",
+            &[&b"alpha"[..], &b"bravo"[..]],
+            b""
+        );
         ok!(
             b'.',
             b"\"alpha.bravo.\"",
@@ -1689,7 +1844,12 @@ mod tests {
             b""
         );
 
-        ok!(b'.', b" \t \t \talpha.", &[&b"alpha"[..], &b""[..]], b"");
+        ok!(
+            b'.',
+            b" \t \t \talpha.",
+            &[&b"alpha"[..], &b""[..]],
+            b""
+        );
 
         // Leading whitespace is consumed only for the first part.
 
@@ -1699,16 +1859,36 @@ mod tests {
             &[&b"alpha"[..], &b"bravo"[..]],
             b""
         );
-        ok!(b'.', b"alpha. bravo", &[&b"alpha"[..], &b""[..]], b" bravo");
+        ok!(
+            b'.',
+            b"alpha. bravo",
+            &[&b"alpha"[..], &b""[..]],
+            b" bravo"
+        );
 
         // Consecutive separators are handled as expected.
 
-        ok!(b'.', b"..", &[&b""[..], &b""[..], &b""[..]], b"");
-        ok!(b'.', b"\"..\"", &[&b""[..], &b""[..], &b""[..]], b"");
+        ok!(
+            b'.',
+            b"..",
+            &[&b""[..], &b""[..], &b""[..]],
+            b""
+        );
+        ok!(
+            b'.',
+            b"\"..\"",
+            &[&b""[..], &b""[..], &b""[..]],
+            b""
+        );
 
         // The separator can be a null.
 
-        ok!(b'\0', b"alpha\0bravo", &[&b"alpha"[..], &b"bravo"[..]], b"");
+        ok!(
+            b'\0',
+            b"alpha\0bravo",
+            &[&b"alpha"[..], &b"bravo"[..]],
+            b""
+        );
 
         // Errors are caught as expected.
 
@@ -1759,7 +1939,12 @@ mod tests {
         ok!(b'.', b".", &[&b""[..], &b""[..]], b"");
         ok!(b'.', b"alpha", &[&b"alpha"[..]], b"");
         ok!(b'.', b"alpha.", &[&b"alpha"[..], &b""[..]], b"");
-        ok!(b'.', b"alpha.bravo", &[&b"alpha"[..], &b"bravo"[..]], b"");
+        ok!(
+            b'.',
+            b"alpha.bravo",
+            &[&b"alpha"[..], &b"bravo"[..]],
+            b""
+        );
         ok!(
             b'.',
             b"alpha.bravo.",
@@ -1776,8 +1961,18 @@ mod tests {
         ok!(b'.', b"\"\"", &[&b""[..]], b"");
         ok!(b'.', b"\".\"", &[&b""[..], &b""[..]], b"");
         ok!(b'.', b"\"alpha\"", &[&b"alpha"[..]], b"");
-        ok!(b'.', b"\"alpha.\"", &[&b"alpha"[..], &b""[..]], b"");
-        ok!(b'.', b"\"alpha.bravo\"", &[&b"alpha"[..], &b"bravo"[..]], b"");
+        ok!(
+            b'.',
+            b"\"alpha.\"",
+            &[&b"alpha"[..], &b""[..]],
+            b""
+        );
+        ok!(
+            b'.',
+            b"\"alpha.bravo\"",
+            &[&b"alpha"[..], &b"bravo"[..]],
+            b""
+        );
         ok!(
             b'.',
             b"\"alpha.bravo.\"",
@@ -1791,7 +1986,12 @@ mod tests {
             b""
         );
 
-        ok!(b'.', b" \t \t \talpha.", &[&b"alpha"[..], &b""[..]], b"");
+        ok!(
+            b'.',
+            b" \t \t \talpha.",
+            &[&b"alpha"[..], &b""[..]],
+            b""
+        );
 
         // Leading whitespace is consumed only for the first part.
 
@@ -1825,16 +2025,36 @@ mod tests {
             &[&b"alpha"[..], &b"bravo"[..]],
             b""
         );
-        ok!(b'.', b"alpha. bravo", &[&b"alpha"[..], &b""[..]], b" bravo");
+        ok!(
+            b'.',
+            b"alpha. bravo",
+            &[&b"alpha"[..], &b""[..]],
+            b" bravo"
+        );
 
         // Consecutive separators are handled as expected.
 
-        ok!(b'.', b"..", &[&b""[..], &b""[..], &b""[..]], b"");
-        ok!(b'.', b"\"..\"", &[&b""[..], &b""[..], &b""[..]], b"");
+        ok!(
+            b'.',
+            b"..",
+            &[&b""[..], &b""[..], &b""[..]],
+            b""
+        );
+        ok!(
+            b'.',
+            b"\"..\"",
+            &[&b""[..], &b""[..], &b""[..]],
+            b""
+        );
 
         // The separator can be a null.
 
-        ok!(b'\0', b"alpha\0bravo", &[&b"alpha"[..], &b"bravo"[..]], b"");
+        ok!(
+            b'\0',
+            b"alpha\0bravo",
+            &[&b"alpha"[..], &b"bravo"[..]],
+            b""
+        );
 
         // Errors are caught as expected.
 
@@ -1896,9 +2116,9 @@ mod tests {
         macro_rules! decode {
             ($dec:expr, $string:expr) => {
                 assert_matches!(
-                    $dec.decode_string(),
-                    Ok(ref x) if x.as_ref() == $string
-                );
+                                    $dec.decode_string(),
+                                    Ok(ref x) if x.as_ref() == $string
+                                );
             };
         }
 
@@ -1932,20 +2152,17 @@ mod tests {
 
         macro_rules! encode {
             ($enc:expr, $parts:expr) => {
-                assert_matches!(
-                    $enc.encode_multi_string(b'.', $parts),
-                    Ok(())
-                );
+                assert_matches!($enc.encode_multi_string(b'.', $parts), Ok(()));
             };
         }
 
         macro_rules! decode {
             ($dec:expr, $parts:expr) => {
                 assert_matches!(
-                    $dec.decode_multi_string(b'.')
-                        .collect::<Result<Vec<_>, _>>(),
-                    Ok(ref x) if x == $parts
-                );
+                                    $dec.decode_multi_string(b'.')
+                                        .collect::<Result<Vec<_>, _>>(),
+                                    Ok(ref x) if x == $parts
+                                );
             };
         }
 
@@ -1958,7 +2175,10 @@ mod tests {
         encode!(enc, vec![&b"alpha)bravo"[..], &b"charlie"[..]]);
         encode!(enc, vec![&b"alpha;bravo"[..], &b"charlie"[..]]);
         encode!(enc, vec![&b"alpha\0bravo"[..], &b"charlie"[..]]);
-        encode!(enc, vec![&b"alpha\xffbravo"[..], &b"charlie"[..]]);
+        encode!(
+            enc,
+            vec![&b"alpha\xffbravo"[..], &b"charlie"[..]]
+        );
         encode!(enc, vec![&b"alpha.bravo"[..], &b"charlie"[..]]);
 
         let text = enc.into_writer();

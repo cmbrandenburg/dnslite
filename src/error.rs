@@ -6,9 +6,10 @@ pub type BoxedError = Box<std::error::Error + Send + Sync>;
 macro_rules! declare_static_error_type {
     (impl $typename:ident, $description:expr) => {
         impl std::fmt::Display for $typename {
-            fn fmt(&self, f: &mut std::fmt::Formatter) ->
-                Result<(), std::fmt::Error>
-            {
+            fn fmt(
+                &self,
+                f: &mut std::fmt::Formatter,
+            ) -> Result<(), std::fmt::Error> {
                 f.write_str(std::error::Error::description(self))
             }
         }

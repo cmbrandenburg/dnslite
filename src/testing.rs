@@ -1,5 +1,5 @@
 #[cfg(test)]
-pub use self::test_only::{HashRecorder, hash_exact};
+pub use self::test_only::{hash_exact, HashRecorder};
 
 #[cfg(test)]
 mod test_only {

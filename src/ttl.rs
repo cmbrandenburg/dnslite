@@ -1,8 +1,8 @@
-use {BoxedError, ascii, std};
 use binary::prelude::*;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use text::prelude::*;
+use {ascii, std, BoxedError};
 
 // RFC 2181, section 8: "...[A] TTL value is an unsigned number, with a minimum
 // value of 0, and a maximum value of 2147483647."
@@ -88,9 +88,8 @@ impl<'a, M: TextDecodeMode> DecodeText<'a, M> for Ttl {
             e
         })?;
 
-        Ttl::from_text_impl(token).map_err(|e| {
-            TextDecodeError::new(EXPECTATION, position, e)
-        })
+        Ttl::from_text_impl(token)
+            .map_err(|e| TextDecodeError::new(EXPECTATION, position, e))
     }
 }
 
@@ -142,7 +141,9 @@ impl Ttl {
             return Err(EBadTtl)?;
         }
 
-        if text.iter().all(|&b| ascii::is_u8_ascii_digit(b)) {
+        if text.iter()
+            .all(|&b| ascii::is_u8_ascii_digit(b))
+        {
             let s = unsafe { std::str::from_utf8_unchecked(text) };
             let n = u32::from_str_radix(s, 10).map_err(|_| EOutOfRange)?;
             if MAX_TTL < n {
@@ -260,8 +261,14 @@ mod tests {
     #[test]
     fn ttl_implements_checked_subtraction() {
         let a = Ttl::from_u32(100).unwrap();
-        assert_eq!(a.checked_sub(Ttl::from_u32(20).unwrap()), Some(Ttl(80)));
-        assert_eq!(a.checked_sub(Ttl::from_u32(100).unwrap()), Some(Ttl(0)));
+        assert_eq!(
+            a.checked_sub(Ttl::from_u32(20).unwrap()),
+            Some(Ttl(80))
+        );
+        assert_eq!(
+            a.checked_sub(Ttl::from_u32(100).unwrap()),
+            Some(Ttl(0))
+        );
         assert_eq!(a.checked_sub(Ttl::from_u32(101).unwrap()), None);
     }
 
@@ -274,9 +281,9 @@ mod tests {
             ($source:expr, $value:expr) => {
                 let mut d = BinaryDecoder::new($source);
                 assert_matches!(
-                    Ttl::decode_binary(&mut d),
-                    Ok(x) if x == Ttl($value)
-                );
+                                    Ttl::decode_binary(&mut d),
+                                    Ok(x) if x == Ttl($value)
+                                );
             };
         }
 
@@ -318,16 +325,16 @@ mod tests {
         macro_rules! ok {
             ($source:expr, $value:expr) => {
                 assert_matches!(
-                    Ttl::from_str($source),
-                    Ok(x) if x == Ttl($value),
-                    "FromStr"
-                );
+                                    Ttl::from_str($source),
+                                    Ok(x) if x == Ttl($value),
+                                    "FromStr"
+                                );
                 let mut d = TextDecoder::new($source.as_bytes());
                 assert_matches!(
-                    Ttl::decode_text(&mut d),
-                    Ok(x) if x == Ttl($value),
-                    "DecodeText"
-                );
+                                    Ttl::decode_text(&mut d),
+                                    Ok(x) if x == Ttl($value),
+                                    "DecodeText"
+                                );
             };
         }
 
@@ -420,9 +427,9 @@ mod tests {
                 let text = e.into_writer();
                 let mut d = TextDecoder::new(&text);
                 assert_matches!(
-                    Ttl::decode_text(&mut d),
-                    Ok(x) if x == Ttl($value)
-                );
+                                    Ttl::decode_text(&mut d),
+                                    Ok(x) if x == Ttl($value)
+                                );
             };
         }
 
